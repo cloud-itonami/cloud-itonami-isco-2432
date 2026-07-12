@@ -1,0 +1,11 @@
+[{:itonami.blueprint/id "cloud-itonami-isco-2432"
+  :itonami.blueprint/name "Community Public Relations"
+  :itonami.blueprint/isco-08 "2432"
+  :itonami.blueprint/domain :business/public-relations
+  :itonami.blueprint/license "AGPL-3.0-or-later"
+  :itonami.blueprint/social-impact [:transparent-communication :local-business-presence :local-jobs]
+  :itonami.blueprint/governor :public-relations-governor
+  :itonami.blueprint/robotics true
+  :itonami.blueprint/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
+  :itonami.blueprint/status :public-oss
+  :db/id -1}]
