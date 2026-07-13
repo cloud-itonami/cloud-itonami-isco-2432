@@ -5,13 +5,25 @@ Open Business Blueprint for **ISCO-08 2432**: Public Relations Professionals —
 pure-cognitive work, the LLM-first wave, **no robotics gate** —
 eligible for actor implementation now.
 
-**Maturity: `:blueprint`** — blueprint only; **no actor implementation
-yet**, and none is claimed. The implemented actor will follow the
-fleet-standard pattern (advisor-LLM sealed behind the independent
-`:public-relations-governor` governor, human approval workflow, append-only
-audit ledger); outbound communication (PR releases, sales outreach) is
-always :external-send and never auto-committed. Fourth wave-0 cognitive
-batch (ADR-2607122700 addenda).
+**Maturity: `:implemented`** — PublicRelationsProfessionalsAdvisor ⊣
+PublicRelationsProfessionalsGovernor as a langgraph StateGraph
+(`intake → advise → govern → decide → commit/hold`, human-approval
+interrupt), modeled on cloud-itonami-isco-4311's bookkeeping actor.
+13 tests / 27 assertions green.
+
+The press-release HARD invariants — an embargo floor and attribution
+traceability, not narrative license:
+
+1. **Embargo floor** — the proposed as-of day must be ≥ the release's
+   registered embargo-lift-day. An embargo is a registered day, not a
+   suggestion.
+2. **Spokesperson membership** — every quoted spokesperson must be a
+   member of the release's registered approved-spokespersons set (no
+   unauthorized attribution).
+
+Also HARD: unregistered/foreign release, unregistered organization,
+non-`:propose` effect. Escalations (always human sign-off):
+`:publish-release` (external publication), low confidence (< 0.6).
 
 AGPL-3.0-or-later, forkable by any qualified operator. Part of the
 [cloud-itonami](https://itonami.cloud) open business fleet.
