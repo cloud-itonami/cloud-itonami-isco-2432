@@ -18,8 +18,16 @@
               unauthorized attribution).
     record  — a committed operating record (approved release) —
               written ONLY via commit-record!.
-    ledger  — append-only audit trail, commit or hold."
-  )
+    ledger  — append-only audit trail, commit or hold. The ledger is
+              CHAINED: `append-ledger!` routes every entry through
+              `prprofessional.ledger/append`, which stamps `:ledger/seq`,
+              `:ledger/prev` and `:ledger/hash`. That is what makes
+              'append-only' a property of the artifact rather than of the
+              code path that produced it — see `prprofessional.ledger`."
+  ;; alias is `led`, not `ledger`: this namespace also defines a protocol
+  ;; method named `ledger`, and shadowing the two names in one file is
+  ;; how a chained append quietly becomes a plain conj again.
+  (:require [prprofessional.ledger :as led]))
 
 (defprotocol Store
   (client [s client-id])
@@ -44,7 +52,7 @@
   (commit-record! [s record]
     (swap! a update :records (fnil conj []) record) s)
   (append-ledger! [s fact]
-    (swap! a update :ledger (fnil conj []) fact) s))
+    (swap! a update :ledger led/append fact) s))
 
 (defn mem-store
   ([] (mem-store {}))

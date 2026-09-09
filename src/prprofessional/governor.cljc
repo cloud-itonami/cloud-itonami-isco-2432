@@ -10,53 +10,101 @@
   license.
 
   HARD invariants (:hard? true, ALWAYS :hold, never overridable):
-    1. client provenance — the organization must be registered.
-    2. no-actuation      — proposal :effect must be :propose.
-    3. release basis       — an approval must cite a REGISTERED
-                           release belonging to this client.
-    4. embargo floor       — the proposed as-of day must be >= the
-                           release's registered :embargo-lift-day (an
-                           embargo is a registered day, not a
-                           suggestion).
-    5. spokesperson membership — every quoted spokesperson must be a
-                           member of the release's registered
-                           :approved-spokespersons set (no
-                           unauthorized attribution).
+    1. envelope         — request, client record and proposal must be
+                          well-formed (`prprofessional.facts`).
+    2. vocabulary       — the op must be declared in
+                          `prprofessional.operation/supported`.
+                          Reserved ops are refused as an authority
+                          boundary, not as a vocabulary error.
+    3. no-actuation     — proposal :effect must be :propose.
+    4. release basis    — a release-bound op must cite a REGISTERED
+                          release belonging to this client.
+    5. embargo floor    — the proposed as-of day must be >= the
+                          release's registered :embargo-lift-day (an
+                          embargo is a registered day, not a
+                          suggestion).
+    6. spokesperson membership — every quoted spokesperson must be a
+                          member of the release's registered
+                          :approved-spokespersons set (no
+                          unauthorized attribution).
   ESCALATION invariants (:escalate? true, human sign-off):
-    6. :op :publish-release (external publication).
-    7. low confidence (< `confidence-floor`)."
+    7. the operation declares `:escalates? true` (e.g.
+       :publish-release, external publication).
+    8. low confidence (< `confidence-floor`).
+
+  Why invariants 4-6 are keyed on `operation/release-op?` rather than
+  on `(= :approve-release op)`. They used to be keyed on the latter,
+  which exempted `:publish-release` — the single operation that
+  actually publishes to the outside world — from all three. Measured
+  on the pre-change tree, against a registered client and a release
+  embargoed to day 10 with `:approved-spokespersons #{\"Alice\"}`:
+
+      {:op :publish-release :effect :propose :release-id \"r1\"
+       :as-of-day 0 :quoted-spokespersons #{\"Mallory\"} :confidence 0.95}
+      => {:ok? false :hard? false :escalate? true :violations []}
+
+  It escalated, so a human was asked — but with an EMPTY violation
+  list. The reviewer was shown nothing to refuse: not the broken
+  embargo, not the unauthorized attribution. The same proposal with
+  `:op :approve-release` hard-blocked on both. Escalation is the safety
+  net for this actor's one externally-visible act, and it was handing
+  the reviewer a clean bill of health for a release that broke every
+  registered fact about itself.
+
+  Binding is a property of the operation, so it is declared once in
+  `prprofessional.operation` and read here — a governor that names one
+  op can forget the other, and did."
   (:require [clojure.set :as set]
+            [prprofessional.facts :as facts]
+            [prprofessional.operation :as op]
             [prprofessional.store :as store]))
 
 (def confidence-floor 0.6)
 
-(defn- hard-violations [{:keys [request proposal]} client-record r]
-  (let [{:keys [op as-of-day quoted-spokespersons]} proposal
-        approve? (= :approve-release op)
+(defn- release-violations
+  "Invariants 4-6: everything that must hold about a proposal bound to a
+  registered release. Only reached for `operation/release-op?` ops."
+  [request proposal r]
+  (let [{:keys [as-of-day quoted-spokespersons]} proposal
         unauthorized (when r (set/difference (set quoted-spokespersons)
-                                             (:approved-spokespersons r)))]
+                                             (set (:approved-spokespersons r))))]
     (cond-> []
+      (nil? r)
+      (conj {:rule :unknown-release :detail "未登録 release への操作は不可"})
+
+      (and r (not= (:client-id r) (:client-id request)))
+      (conj {:rule :release-wrong-client :detail "release が別 client のもの"})
+
+      (and r (integer? as-of-day) (< as-of-day (:embargo-lift-day r)))
+      (conj {:rule :embargo-not-lifted
+             :detail (str "day " as-of-day " < エンバーゴ解禁日 "
+                          (:embargo-lift-day r) "（エンバーゴは登録済み日付であって提案ではない）")})
+
+      (and r (seq unauthorized))
+      (conj {:rule :unauthorized-attribution
+             :detail (str "未承認の発言者引用 " (vec unauthorized)
+                          "（引用は追跡性であって物語上の裁量ではない）")}))))
+
+(defn- hard-violations [request proposal client-record r]
+  (let [envelope (concat (facts/request-violations request)
+                         (when (some? client-record)
+                           (facts/client-record-violations client-record))
+                         (facts/proposal-violations proposal)
+                         (facts/release-binding-violations proposal))
+        vocabulary (facts/vocabulary-violations proposal)]
+    (cond-> (vec (concat envelope vocabulary))
+      ;; Provenance. `nil?` alone was defeated by registering a blank client
+      ;; record under the key `nil`; the envelope rules above reject the
+      ;; unusable record and the client-less request independently, so this
+      ;; rule now means what its name says.
       (nil? client-record)
       (conj {:rule :no-client :detail "未登録 client"})
 
       (not= :propose (:effect proposal))
       (conj {:rule :no-actuation :detail "effect は :propose のみ許可（直接書込禁止）"})
 
-      (and approve? (nil? r))
-      (conj {:rule :unknown-release :detail "未登録 release への承認は不可"})
-
-      (and approve? r (not= (:client-id r) (:client-id request)))
-      (conj {:rule :release-wrong-client :detail "release が別 client のもの"})
-
-      (and approve? r (integer? as-of-day) (< as-of-day (:embargo-lift-day r)))
-      (conj {:rule :embargo-not-lifted
-             :detail (str "day " as-of-day " < エンバーゴ解禁日 "
-                          (:embargo-lift-day r) "（エンバーゴは登録済み日付であって提案ではない）")})
-
-      (and approve? r (seq unauthorized))
-      (conj {:rule :unauthorized-attribution
-             :detail (str "未承認の発言者引用 " (vec unauthorized)
-                          "（引用は追跡性であって物語上の裁量ではない）")}))))
+      (op/release-op? (:op proposal))
+      (into (release-violations request proposal r)))))
 
 (defn check
   "Assess a proposal against `request`/`context`/`proposal` and a
@@ -65,12 +113,11 @@
   [request context proposal store]
   (let [client-record (store/client store (:client-id request))
         r (some->> (:release-id proposal) (store/release store))
-        hard (hard-violations {:request request :proposal proposal}
-                              client-record r)
+        hard (hard-violations request proposal client-record r)
         hard? (boolean (seq hard))
         conf (or (:confidence proposal) 0.0)
-        low? (< conf confidence-floor)
-        risky-op? (= :publish-release (:op proposal))]
+        low? (or (not (number? conf)) (< conf confidence-floor))
+        risky-op? (op/escalates? (:op proposal))]
     {:ok? (and (not hard?) (not low?) (not risky-op?))
      :violations hard
      :confidence conf

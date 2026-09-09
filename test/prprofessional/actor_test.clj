@@ -34,8 +34,11 @@
 (deftest interrupts-then-publishes-on-human-approval
   (let [st (fresh-store)
         graph (actor/build-graph {:store st})
+        ;; :as-of-day 250 is new: a publication now has to name the day it
+        ;; is compared against, because the embargo floor binds
+        ;; :publish-release too. The assertions below are unchanged.
         request {:client-id "client-1" :op :publish-release :stake :high
-                 :release-id "R-1" :quoted-spokespersons #{"CEO"}}
+                 :release-id "R-1" :as-of-day 250 :quoted-spokespersons #{"CEO"}}
         interrupted (actor/run-request! graph request {} "thread-3")]
     (is (= :interrupted (:status interrupted)))
     (is (empty? (store/records-of st "client-1")))
