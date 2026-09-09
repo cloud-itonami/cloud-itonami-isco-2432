@@ -21,6 +21,8 @@
             [langgraph.checkpoint :as cp]
             [prprofessional.advisor :as advisor]
             [prprofessional.governor :as governor]
+            [prprofessional.ledger :as led]
+            [prprofessional.phase :as phase]
             [prprofessional.store :as store]))
 
 (defn build-graph
@@ -53,24 +55,30 @@
                         :audit [{:node :govern :verdict v}]})))
       (g/add-node :decide
                    (fn [{:keys [verdict]}]
-                     {:disposition (cond
-                                     (:hard? verdict) :hold
-                                     (:escalate? verdict) :request-approval
-                                     :else :commit)}))
+                     ;; The routing rule lives in `prprofessional.phase` so it
+                     ;; can be tested without building a graph, and so a
+                     ;; ledger entry can carry the phase by name.
+                     {:disposition (phase/of-verdict verdict)}))
       (g/add-node :request-approval (fn [s] s))
       (g/add-node :commit
-                   (fn [{:keys [request proposal]}]
+                   (fn [{:keys [request proposal disposition]}]
                      (let [record {:client-id (:client-id request)
                                     :op (:op proposal)
                                     :release-id (:release-id proposal)
-                                    :payload proposal}]
+                                    :payload proposal}
+                           ;; A publication a human authorised and one the
+                           ;; actor took itself are different acts. Before
+                           ;; this, the ledger said the same thing about both.
+                           approved-by (if (phase/approved-commit? disposition)
+                                         :human
+                                         :actor)]
                        (store/commit-record! store record)
-                       (store/append-ledger! store {:disposition :commit :record record})
+                       (store/append-ledger! store (led/commit-entry record approved-by))
                        {:record record
-                        :audit [{:node :commit :record record}]})))
+                        :audit [{:node :commit :record record :approved-by approved-by}]})))
       (g/add-node :hold
                    (fn [{:keys [verdict]}]
-                     (store/append-ledger! store {:disposition :hold :verdict verdict})
+                     (store/append-ledger! store (led/hold-entry verdict))
                      {:audit [{:node :hold :verdict verdict}]}))
       (g/set-entry-point :intake)
       (g/add-edge :intake :advise)
