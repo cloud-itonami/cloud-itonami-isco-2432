@@ -10,7 +10,7 @@ PublicRelationsProfessionalsGovernor as a langgraph StateGraph
 (`intake → advise → govern → decide → commit/hold`, human-approval
 interrupt), modeled on cloud-itonami-isco-4311's bookkeeping actor.
 62 tests / 149 assertions green, plus a governed-scenario harness
-(`clojure -M:sim`: 16 scenarios, 14 refusals).
+(`kbb -M:sim`: 16 scenarios, 14 refusals).
 
 The press-release HARD invariants — an embargo floor and attribution
 traceability, not narrative license:
@@ -50,7 +50,7 @@ a human authorised and one the actor took itself are different acts.
 Truncation is *not* detectable without an external anchor, and
 `prprofessional.ledger/verify` claims only what it can show.
 
-Run the governed scenarios with `clojure -M:sim`. It exits non-zero
+Run the governed scenarios with `kbb -M:sim`. It exits non-zero
 when the table demonstrates **no** refusal: a governed actor that
 refuses nothing has shown nothing, and a harness that printed green
 there would be theatre.
