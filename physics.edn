@@ -1,0 +1,33 @@
+;; What this vertical's robot physically does, declared for
+;; kotoba.robotics.process (kotoba-lang/robotics). `kbb -M:physics` runs it.
+;;
+;; ISCO 2432, public relations professionals. The README calls this pure-cognitive work with no robotics
+;; gate; blueprint.edn nevertheless declares :itonami.blueprint/robotics true.
+;; The physical work declared here is the handling the occupation itself
+;; entails (ASSUMPTION, not stated in the README): carrying the press-event booth kit (banner stands, backdrop, press-kit boxes) into the venue, and placing press-kit boxes on the media table.
+;; Replace with the README premise once one is written.
+;;
+;; Every number without a cited source is marked `estimate` in its :basis.
+;; Replacing an estimate with a sourced value is this bot's growth work.
+{:physics/schema "itonami.physical-ai.spec.v1"
+ :repo "cloud-itonami/cloud-itonami-isco-2432"
+ :cases
+ [{:id :press-booth-kit-haul
+   :kind :transport
+   :procedure "AMR hauls the press-event booth kit (banner stands, backdrop frame, press-kit boxes) from the loading dock to the press room"
+   :params {:mass-kg 50.0 :distance-m 80.0 :v-max-mps 1.2 :a-max-mps2 0.5
+            :brake-decel-mps2 0.7 :drive-force-n 80.0 :crr 0.025
+            :cog-height-m 0.80 :support-half-length-m 0.30}
+   :sweep {:param :payload-kg :values [20.0 50.0 90.0 130.0 170.0]}
+   :quantity :cycle-time-s
+   :limit {:max 90.0 :basis "estimate: each haul within 90 s so the booth is up in the 30-minute venue access window before doors open"}
+   :boundary {:lo 5.0 :hi 250.0}}
+  {:id :press-kits-onto-media-table
+   :kind :manipulator
+   :procedure "arm lifts a box of printed press kits from the cart onto the media sign-in table"
+   :params {:l1-m 0.45 :l2-m 0.40 :m1-kg 3.5 :m2-kg 2.5
+            :from [0.55 -0.30] :to [0.55 0.15] :duration-s 1.8 :steps 500}
+   :sweep {:param :payload-kg :values [1.0 3.0 5.0 7.0 9.0]}
+   :quantity :peak-tau1-nm
+   :limit {:max 60.0 :basis "estimate: continuous shoulder torque of a light collaborative arm (~5 kg class)"}
+   :boundary {:lo 0.1 :hi 30.0}}]}
