@@ -2,7 +2,7 @@
   "PublicRelationsProfessionalsGovernor — the independent safety/
   traceability layer for the ISCO-08 2432 community public relations
   professionals actor (itonami actor pattern, ADR-2607011000 /
-  CLAUDE.md Actors section). Modeled on cloud-itonami-isco-4311's
+  AGENTS.md Actors section). Modeled on cloud-itonami-isco-4311's
   bookkeeping.governor. PR twist: an embargo lift day is a registered
   floor a proposed publication day must not precede, and every quoted
   spokesperson must be a member of the registered approved-
